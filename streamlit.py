@@ -10,34 +10,52 @@ import seaborn as sns
 from pyheatmap.heatmap import HeatMap
 import matplotlib.pyplot as plt 
 
-#net
-net = model.DeepLPFNet()
-checkpoint_filepath = './pretrained_models/adobe_dpe/deeplpf_validpsnr_23.378_validloss_0.033_testpsnr_23.904_testloss_0.031_epoch_424_model.pt'
-net.load_state_dict(torch.load(checkpoint_filepath))
-net.eval()
-net.cuda()
+#choose input image
+img = st.columns(6)
+input_image = None
+gt_image = None
+input_images = ['1.png','2.png','3.png','4.png','5.png','6.png']
+j = 0
+for i in input_images:
+    with img[j]:
+        if st.button(i):
+            input_image = Image.open('./images/input/'+i)
+            gt_image = Image.open('./images/groundtruth/'+i)
+        j = j+1
 
-uploaded_file = st.file_uploader("", type=["jpg", "png", "bmp", "jpeg"])
-col1, col2 = st.columns(2)
-col3,col4,col5 = st.columns(3)
-if uploaded_file is not None:
-    img_PIL = Image.open(uploaded_file).convert('RGB')
-    with col1:
+
+if input_image is not None:
+    #initiate net
+    net = model.DeepLPFNet()
+    checkpoint_filepath = './pretrained_models/adobe_dpe/deeplpf_validpsnr_23.378_validloss_0.033_testpsnr_23.904_testloss_0.031_epoch_424_model.pt'
+    net.load_state_dict(torch.load(checkpoint_filepath))
+    net.eval()
+    net.cuda()
+
+    #display label image
+    in_image, label_image, out_image = st.columns(3)
+    gt_image =gt_image.convert('RGB')
+    with label_image:
+        st.header("Label")
+        st.image(gt_image)
+    #display input image
+    input_image = input_image.convert('RGB')
+    with in_image:
         st.header("Input")
-        st.image(img_PIL)
+        st.image(input_image)
 
+    # backbone net
     transform = T.ToTensor()
-    img = transform(img_PIL)
+    img = transform(input_image)
     img = img.unsqueeze(0)
     img = img.cuda()
 
-    # backbone net
     x = net.backbonenet(img)
     feat = x[:, 3:64, :, :]
     img = x[:, 0:3, :, :]
-
     torch.cuda.empty_cache()
     shape = x.shape
+
     # get masks
     img_cubic,cubic_mask = net.deeplpfnet.cubic_filter.get_cubic_mask(feat, img)
     mask_scale_graduated = net.deeplpfnet.graduated_filter.get_graduated_mask(feat, img_cubic)
@@ -54,10 +72,12 @@ if uploaded_file is not None:
     #result
     outimg = img.squeeze(0).permute(1,2,0)
     outimg = outimg.mul(255).byte().cpu().detach().numpy()
-    with col2:
-        st.header("result")
+    with out_image:
+        st.header("Result")
         st.image(outimg)
 
+
+    col3,col4,col5 = st.columns(3)
     #elliptical
     elliptical = mask_scale_elliptical.squeeze(0).permute(1,2,0)
     elliptical = elliptical.mul(255)
