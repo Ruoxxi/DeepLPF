@@ -31,13 +31,14 @@ if uploaded_file is not None:
     img = img.unsqueeze(0)
     img = img.cuda()
 
+    # backbone net
     x = net.backbonenet(img)
     feat = x[:, 3:64, :, :]
     img = x[:, 0:3, :, :]
 
     torch.cuda.empty_cache()
     shape = x.shape
-
+    # get masks
     img_cubic,cubic_mask = net.deeplpfnet.cubic_filter.get_cubic_mask(feat, img)
     mask_scale_graduated = net.deeplpfnet.graduated_filter.get_graduated_mask(feat, img_cubic)
     mask_scale_elliptical = net.deeplpfnet.elliptical_filter.get_elliptical_mask(feat, img_cubic)
@@ -49,6 +50,7 @@ if uploaded_file is not None:
     mask_scale_elliptical = torch.clamp(mask_scale_elliptical,0,1)
     mask_scale_graduated = torch.clamp(mask_scale_graduated,0,1)
     cubic_mask = torch.clamp(cubic_mask,0,1)
+
     #result
     outimg = img.squeeze(0).permute(1,2,0)
     outimg = outimg.mul(255).byte().cpu().detach().numpy()
@@ -58,7 +60,6 @@ if uploaded_file is not None:
 
     #elliptical
     elliptical = mask_scale_elliptical.squeeze(0).permute(1,2,0)
-    
     elliptical = elliptical.mul(255)
     print(elliptical)
     elliptical = elliptical.byte().cpu().detach().numpy()
@@ -69,8 +70,8 @@ if uploaded_file is not None:
         st.header("elliptical")
         st.markdown("green channel")
         st.image(image)
-
     plt.close('all')
+
     #graduated
     graduated = mask_scale_graduated.squeeze(0).permute(1,2,0)
     graduated = graduated.mul(255).byte().cpu().detach().numpy()
@@ -82,8 +83,8 @@ if uploaded_file is not None:
         st.header("graduated")
         st.markdown("blue channel")
         st.image(image)
-    
     plt.close('all')
+
     #cubic
     cubic_mask = cubic_mask.squeeze(0).permute(1,2,0)
     cubic_mask = cubic_mask.mul(255).byte().cpu().detach().numpy()
