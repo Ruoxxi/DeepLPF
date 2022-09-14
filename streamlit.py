@@ -21,8 +21,13 @@ for i in input_images:
         if st.button(i):
             input_image = Image.open('./images/input/'+i)
             gt_image = Image.open('./images/groundtruth/'+i)
+        st.image(Image.open('./images/input/'+i))
         j = j+1
 
+
+#get threshold
+st.header("Choose a threshold")
+threshold = st.slider('Threshold:(%)',0,100,50)
 
 if input_image is not None:
     #initiate net
@@ -38,6 +43,7 @@ if input_image is not None:
     with label_image:
         st.header("Label")
         st.image(gt_image)
+
     #display input image
     input_image = input_image.convert('RGB')
     with in_image:
@@ -62,7 +68,7 @@ if input_image is not None:
     mask_scale_elliptical = net.deeplpfnet.elliptical_filter.get_elliptical_mask(feat, img_cubic)
     
     mask_scale_fuse = torch.clamp(mask_scale_graduated+mask_scale_elliptical, 0, 2)
-    img_fuse = torch.clamp(img_cubic*mask_scale_fuse, 0, 1)
+    img_fuse = torch.clamp(img_cubic*mask_scale_fuse, 0, 1)*threshold/100
     img = torch.clamp(img_fuse+img, 0, 1)
 
     mask_scale_elliptical = torch.clamp(mask_scale_elliptical,0,1)
