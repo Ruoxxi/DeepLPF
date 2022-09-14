@@ -24,7 +24,6 @@ for i in input_images:
         st.image(Image.open('./images/input/'+i))
         j = j+1
 
-
 #get threshold
 st.header("Choose a threshold")
 threshold = st.slider('Threshold:(%)',0,100,50)
@@ -37,8 +36,8 @@ if input_image is not None:
     net.eval()
     net.cuda()
 
-    #display label image
-    in_image, label_image, out_image = st.columns(3)
+    # #display label image
+    in_image, label_image, out_image, diff_image = st.columns(4)
     gt_image =gt_image.convert('RGB')
     with label_image:
         st.header("Label")
@@ -52,11 +51,13 @@ if input_image is not None:
 
     # backbone net
     transform = T.ToTensor()
-    img = transform(input_image)
-    img = img.unsqueeze(0)
-    img = img.cuda()
+    input_image = transform(input_image)
+    input_image = input_image.unsqueeze(0)
+    input_image = input_image.cuda()
 
-    x = net.backbonenet(img)
+    x = net.backbonenet(input_image)
+    x.contiguous()  # remove memory holes
+    x.cuda()
     feat = x[:, 3:64, :, :]
     img = x[:, 0:3, :, :]
     torch.cuda.empty_cache()
@@ -66,14 +67,14 @@ if input_image is not None:
     img_cubic,cubic_mask = net.deeplpfnet.cubic_filter.get_cubic_mask(feat, img)
     mask_scale_graduated = net.deeplpfnet.graduated_filter.get_graduated_mask(feat, img_cubic)
     mask_scale_elliptical = net.deeplpfnet.elliptical_filter.get_elliptical_mask(feat, img_cubic)
-    
     mask_scale_fuse = torch.clamp(mask_scale_graduated+mask_scale_elliptical, 0, 2)
     img_fuse = torch.clamp(img_cubic*mask_scale_fuse, 0, 1)*threshold/100
     img = torch.clamp(img_fuse+img, 0, 1)
 
-    mask_scale_elliptical = torch.clamp(mask_scale_elliptical,0,1)
-    mask_scale_graduated = torch.clamp(mask_scale_graduated,0,1)
-    cubic_mask = torch.clamp(cubic_mask,0,1)
+    mask_scale_elliptical = torch.clamp(mask_scale_elliptical,0,1)*threshold/100
+    mask_scale_graduated = torch.clamp(mask_scale_graduated,0,1)*threshold/100
+    
+    cubic_mask = torch.clamp(cubic_mask,0,1)*threshold/100
 
     #result
     outimg = img.squeeze(0).permute(1,2,0)
@@ -82,12 +83,24 @@ if input_image is not None:
         st.header("Result")
         st.image(outimg)
 
+    #diff_image
+    outimg = np.array(outimg).astype(np.float32)
+    gt_image = np.array(gt_image).astype(np.float32)
+    # diffimg = np.abs(outimg-gt_image)
+    diff = cv2.absdiff(outimg,gt_image)
+    diff[:,:,0],diff[:,:,2] = 0,0
+    
+    diff[diff > 10]= 255
+    diff[diff <= 10] = 0
+    with diff_image:
+        st.header("Diff")
+        st.image(diff,clamp=True)
+
 
     col3,col4,col5 = st.columns(3)
     #elliptical
     elliptical = mask_scale_elliptical.squeeze(0).permute(1,2,0)
     elliptical = elliptical.mul(255)
-    print(elliptical)
     elliptical = elliptical.byte().cpu().detach().numpy()
     sns.heatmap(data=elliptical[:,:,1])
     plt.savefig('sns1.jpg', dpi = 600)
@@ -101,7 +114,6 @@ if input_image is not None:
     #graduated
     graduated = mask_scale_graduated.squeeze(0).permute(1,2,0)
     graduated = graduated.mul(255).byte().cpu().detach().numpy()
-    print(graduated.shape)
     sns.heatmap(data=graduated[:,:,2])
     plt.savefig('sns2.jpg', dpi = 600)
     image = Image.open('sns2.jpg')
