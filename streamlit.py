@@ -31,7 +31,7 @@ threshold = st.slider('Threshold:(%)',0,100,50)
 if input_image is not None:
     #initiate net
     net = model.DeepLPFNet()
-    checkpoint_filepath = './pretrained_models/adobe_dpe/deeplpf_validpsnr_23.378_validloss_0.033_testpsnr_23.904_testloss_0.031_epoch_424_model.pt'
+    checkpoint_filepath = './pretrained_models/adobe_upe/deeplpf_validpsnr_32.068971287609415_validloss_0.01073065772652626_testpsnr_25.13364554976333_testloss_0.0252277459949255_epoch_424_model.pt'
     net.load_state_dict(torch.load(checkpoint_filepath))
     net.eval()
     net.cuda()
